@@ -4,11 +4,11 @@ import App from './App';
 import './index.css';
 import { dbService } from './services/db';
 
-// Migrate any plain-text admin PIN to SHA-256 hash on app start
-dbService.migrateAdminPin();
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Pages read site data synchronously, so load it from Supabase before the first render.
+dbService.ready.finally(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});

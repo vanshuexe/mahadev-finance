@@ -31,8 +31,10 @@ import {
 
 export const AdminPage: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   // Active admin tab
   const [activeTab, setActiveTab] = useState<'applications' | 'loans' | 'properties' | 'library' | 'settings' | 'content'>('applications');
@@ -82,13 +84,24 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     setIsLoggedIn(dbService.isAdminLoggedIn());
     refreshData();
-    const unsub = dbService.subscribe(() => refreshData());
-    return unsub;
+    const unsub = dbService.subscribe(() => {
+      setIsLoggedIn(dbService.isAdminLoggedIn());
+      refreshData();
+    });
+    const onWriteError = (e: Event) => showToast(`Save failed: ${(e as CustomEvent<string>).detail}`);
+    window.addEventListener('mahadev_db_error', onWriteError);
+    return () => {
+      unsub();
+      window.removeEventListener('mahadev_db_error', onWriteError);
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (await dbService.adminLogin(pinInput)) {
+    setLoggingIn(true);
+    const ok = await dbService.adminLogin(emailInput, pinInput);
+    setLoggingIn(false);
+    if (ok) {
       setIsLoggedIn(true);
       setLoginError(false);
       setPinInput('');
@@ -98,8 +111,8 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    dbService.adminLogout();
+  const handleLogout = async () => {
+    await dbService.adminLogout();
     setIsLoggedIn(false);
     setSelectedApp(null);
   };
@@ -216,18 +229,41 @@ export const AdminPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4 text-xs">
+            {!dbService.isConfigured && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.</span>
+              </div>
+            )}
+
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Security Passcode PIN
+                Admin Email
+              </label>
+              <input
+                type="email"
+                required
+                autoFocus
+                autoComplete="username"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-[#024089] focus:bg-white outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Password
               </label>
               <input
                 type="password"
                 required
-                autoFocus
+                autoComplete="current-password"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
                 placeholder="Enter Admin Password"
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center text-lg font-mono tracking-widest text-slate-900 focus:border-[#024089] focus:bg-white outline-none"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-[#024089] focus:bg-white outline-none"
               />
             </div>
 
@@ -240,9 +276,10 @@ export const AdminPage: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-[#024089] hover:bg-[#012d61] text-white font-bold uppercase tracking-wider rounded-xl text-xs shadow-xs cursor-pointer transition-colors"
+              disabled={loggingIn}
+              className="w-full py-3.5 bg-[#024089] hover:bg-[#012d61] disabled:opacity-60 text-white font-bold uppercase tracking-wider rounded-xl text-xs shadow-xs cursor-pointer transition-colors"
             >
-              Authorize Executive Session
+              {loggingIn ? 'Signing in...' : 'Authorize Executive Session'}
             </button>
           </form>
         </div>
@@ -283,7 +320,8 @@ export const AdminPage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
+              onClick={async () => {
+                await dbService.refresh();
                 refreshData();
                 showToast('Records Refreshed');
               }}
@@ -1134,14 +1172,34 @@ export const AdminPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-semibold text-gray-400 block mb-1">Admin Access Security PIN</label>
-                <input
-                  type="text"
-                  value={settings.adminPin}
-                  onChange={(e) => setSettings({ ...settings, adminPin: e.target.value })}
-                  className="w-full max-w-xs px-3 py-2 bg-[#07111f] border border-[#c9902a]/25 rounded-lg text-xs font-mono text-gray-100 focus:border-[#e8b820]/50 focus:outline-none transition-colors"
-                />
+                <label className="font-semibold text-gray-400 block mb-1">Admin Login</label>
+                <p className="text-[11px] text-gray-500">
+                  Admin accounts are managed in Supabase (Authentication → Users). Change the password there.
+                </p>
               </div>
+
+              {dbService.hasLegacyLocalData() && (
+                <div className="p-3 rounded-xl border border-[#e8b820]/30 bg-[#e8b820]/5 space-y-2">
+                  <p className="text-[11px] text-gray-300">
+                    This browser still holds data from the old local-only version (enquiries, listings, content).
+                    Upload it to Supabase once.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const count = await dbService.importLegacyLocalData();
+                        refreshData();
+                        showToast(`Imported to Supabase (${count} enquiries added)`);
+                      } catch (err) {
+                        showToast(`Import failed: ${(err as Error).message}`);
+                      }
+                    }}
+                    className="py-2 px-4 bg-[#e8b820] hover:bg-[#d4a51a] text-[#07111f] font-semibold text-xs rounded-lg cursor-pointer transition-colors"
+                  >
+                    Upload local data to Supabase
+                  </button>
+                </div>
+              )}
 
               <div className="pt-4 flex items-center justify-between border-t border-[#c9902a]/15">
                 <button
@@ -1156,15 +1214,15 @@ export const AdminPage: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    if (window.confirm('Reset all demo data back to default initial seed?')) {
+                    if (window.confirm('Reset loans, properties, library and global settings to the default seed? Customer enquiries are kept.')) {
                       dbService.resetToDefaults();
                       refreshData();
-                      showToast('Database reset to defaults');
+                      showToast('Site data reset to defaults');
                     }
                   }}
                   className="text-xs text-rose-400 hover:text-rose-300 hover:underline font-medium"
                 >
-                  Reset Demo Data Seed
+                  Reset Site Data to Defaults
                 </button>
               </div>
             </div>

@@ -1,5 +1,7 @@
-// Real-time Persistent Database Engine for Mahadev Finance, DC Property Vala & Library System
-// Supports full CRUD, reactive subscriptions, Admin state management, and CSV export.
+// Persistent database layer for Mahadev Finance, DC Property Vala & Library System, backed by Supabase.
+// Supports full CRUD, reactive subscriptions and admin auth (Supabase Auth). Schema: supabase/schema.sql.
+
+import { supabase, isSupabaseConfigured } from './supabase';
 
 export interface ApplicationNote {
   id: string;
@@ -128,7 +130,6 @@ export interface SiteSettings {
   instagramUrl: string; // Primary Property: @dcpropertyvala_jodhpur
   instagramPersonalUrl?: string; // Founder Personal: @ekshivbhaktt___
   instagramFinanceUrl?: string; // Finance Desk: @mahadev_finance_jodhpur93
-  adminPin: string;
   noticeBanner: string;
   founderImageUrl?: string;
   officeBannerUrl?: string;
@@ -770,166 +771,183 @@ const INITIAL_SETTINGS: SiteSettings = {
   instagramUrl: 'https://www.instagram.com/dcpropertyvala_jodhpur?stkn=MWRsMWNzY3NtYjJjdA==',
   instagramPersonalUrl: 'https://www.instagram.com/ekshivbhaktt___?stkn=cXJ0YmJjMnduaHJo',
   instagramFinanceUrl: 'https://www.instagram.com/mahadev_finance_jodhpur93?stkn=NnA1ZnY3bnkwMTBx',
-  // SHA-256 hash of 'ADMIN@125677656' — never store plain-text password
-  adminPin: '203556992716e27549de6f4bab1b7d58e37265d3456d68edf758d3c861db972a',
   noticeBanner: 'Serving Jodhpur across 3 Prime Branches: Jalori Gate, Kudi Sector 5 & Saraswati Nagar.',
   founderImageUrl: 'https://ik.imagekit.io/fdhgiehjz/WhatsApp%20Image%202026-09-29%20at%207.56.02%20PM_nKmI33Jdg.jpeg',
   officeBannerUrl: 'https://ik.imagekit.io/fdhgiehjz/tt.jpeg'
 };
 
-const INITIAL_APPLICATIONS: ApplicationRecord[] = [
-  {
-    id: 'APP-10294',
-    type: 'gold-loan-enquiry',
-    category: 'Finance',
-    title: 'Gold Loan Enquiry (65 Grams)',
-    customerName: 'Rajesh Meena',
-    mobile: '9828114422',
-    city: 'Jaipur',
-    status: 'In Review',
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    details: {
-      approxGoldWeight: '65 grams',
-      requiredLoanAmount: '₹3,50,000',
-      purpose: 'Emergency Business Working Capital',
-      preferredTime: 'Morning 10 AM - 12 PM',
-      cityArea: 'Mansarovar, Jaipur',
-      message: 'Need cash against 22k gold bangles and chain today itself.'
-    },
-    notes: [
-      {
-        id: 'n1',
-        text: 'Customer contacted on phone. Invited to branch at 11:30 AM with original jewellery for digital karatometer appraisal.',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-        author: 'Dharmendra Choudhary Danga'
-      }
-    ]
-  },
-  {
-    id: 'APP-10293',
-    type: 'rental-enquiry',
-    category: 'Rental',
-    title: 'Bank Space Rental Enquiry',
-    customerName: 'Suresh Singhania',
-    mobile: '9414022331',
-    city: 'Rajasthan',
-    status: 'New',
-    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    details: {
-      companyName: 'Private Bank Zonal Expansion Desk',
-      contactPerson: 'Suresh Singhania',
-      rentalCategory: 'Bank',
-      carpetArea: '2,500 - 3,500 sq ft',
-      preferredLocation: 'Main Market Road / High Footfall Crossroad',
-      expectedBudget: '₹80,000 - ₹1,20,000 / month',
-      message: 'Looking for ground floor building with 3-phase power and wide parking for upcoming branch opening.'
-    },
-    notes: []
-  },
-  {
-    id: 'APP-10292',
-    type: 'library-admission',
-    category: 'Library',
-    title: 'Saraswati Girls Library Admission',
-    customerName: 'Pooja Choudhary',
-    mobile: '9782550011',
-    city: 'Jaipur',
-    status: 'Approved',
-    createdAt: new Date(Date.now() - 3600000 * 28).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 10).toISOString(),
-    details: {
-      wing: 'Saraswati Girls Library',
-      gender: 'Female',
-      examTarget: 'RAS / State Civil Services 2026',
-      shift: 'Full Day Intensive (6:00 AM - 11:00 PM)',
-      startDate: 'Immediate',
-      message: 'Need fixed corner desk with locker for deep preparation.'
-    },
-    notes: [
-      {
-        id: 'n2',
-        text: 'Seat #G-14 allocated. Fee received for 1st month. ID badge issued.',
-        createdAt: new Date(Date.now() - 3600000 * 10).toISOString(),
-        author: 'Library Admin'
-      }
-    ]
-  },
-  {
-    id: 'APP-10291',
-    type: 'property-listing-request',
-    category: 'Property',
-    title: 'Property Listing Request (Commercial Plot)',
-    customerName: 'Kailash Chand Verma',
-    mobile: '9829988771',
-    city: 'Jaipur',
-    status: 'Follow-up',
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    details: {
-      propertyType: 'Plot',
-      transactionType: 'Sell',
-      location: 'Near Metro Station Pillar 124',
-      expectedPrice: '₹75,00,000',
-      areaDimensions: '250 Sq Yards, 30x75 ft',
-      description: 'Commercial conversion done, clear title, immediate seller.'
-    },
-    notes: [
-      {
-        id: 'n3',
-        text: 'Inspected site on Tuesday. Photos taken for DC Property listing catalogue.',
-        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-        author: 'Dharmendra Choudhary Danga'
-      }
-    ]
-  }
-];
 
-// LocalStorage Keys
-const KEYS = {
+// Keys used by the previous localStorage-only version; read only to import old data into Supabase.
+const LEGACY_KEYS = {
   APPLICATIONS: 'mahadev_db_applications_v1',
   LOANS: 'mahadev_db_loans_v1',
   PROPERTIES: 'mahadev_db_properties_v1',
   LIBRARY: 'mahadev_db_library_v1',
   SETTINGS: 'mahadev_db_settings_v1',
-  CONTENT: 'mahadev_db_content_v1',
-  ADMIN_SESSION: 'mahadev_admin_session_v1'
+  CONTENT: 'mahadev_db_content_v1'
+};
+
+const HYDRATE_TIMEOUT_MS = 6000;
+
+interface ApplicationRow {
+  id: string;
+  type: ApplicationType;
+  category: ApplicationCategory;
+  title: string;
+  customer_name: string;
+  mobile: string;
+  city: string;
+  status: ApplicationStatus;
+  created_at: string;
+  updated_at: string;
+  details: Record<string, any>;
+  notes: ApplicationNote[];
+}
+
+const toRow = (a: ApplicationRecord): ApplicationRow => ({
+  id: a.id,
+  type: a.type,
+  category: a.category,
+  title: a.title,
+  customer_name: a.customerName,
+  mobile: a.mobile,
+  city: a.city,
+  status: a.status,
+  created_at: a.createdAt,
+  updated_at: a.updatedAt,
+  details: a.details,
+  notes: a.notes
+});
+
+const fromRow = (r: ApplicationRow): ApplicationRecord => ({
+  id: r.id,
+  type: r.type,
+  category: r.category,
+  title: r.title,
+  customerName: r.customer_name,
+  mobile: r.mobile,
+  city: r.city,
+  status: r.status,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  details: r.details || {},
+  notes: r.notes || []
+});
+
+// Pre-Supabase settings carried a hashed admin PIN; login now goes through Supabase Auth.
+const stripLegacySettings = (s: any): SiteSettings => {
+  const { adminPin: _legacyPin, ...rest } = s || {};
+  return rest as SiteSettings;
 };
 
 class MahadevDatabaseService {
   private listeners: Set<() => void> = new Set();
 
+  // In-memory cache so the UI keeps reading synchronously; Supabase is the source of truth.
+  private applications: ApplicationRecord[] = [];
+  private loans: LoanCategoryItem[] = INITIAL_LOANS;
+  private properties: PropertyListingItem[] = INITIAL_PROPERTIES;
+  private library: LibraryConfig = INITIAL_LIBRARY_CONFIG;
+  private settings: SiteSettings = stripLegacySettings(INITIAL_SETTINGS);
+  private content: WebsiteContent = INITIAL_WEBSITE_CONTENT;
+  private loggedIn = false;
+
+  public readonly ready: Promise<void>;
+
   constructor() {
-    this.init();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', () => this.notify());
+    this.ready = this.hydrate();
+  }
+
+  public get isConfigured(): boolean {
+    return isSupabaseConfigured;
+  }
+
+  // --- LOADING ---
+  private async hydrate(): Promise<void> {
+    if (!supabase) return;
+    try {
+      await Promise.race([
+        this.loadAll(),
+        new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Supabase timeout')), HYDRATE_TIMEOUT_MS))
+      ]);
+    } catch (err) {
+      console.error('Could not load data from Supabase, showing defaults:', err);
+    }
+    supabase.auth.onAuthStateChange((_event, session) => {
+      const nowLoggedIn = Boolean(session);
+      if (nowLoggedIn === this.loggedIn) return;
+      this.loggedIn = nowLoggedIn;
+      if (!nowLoggedIn) this.applications = [];
+      this.notify();
+    });
+  }
+
+  private async loadAll(): Promise<void> {
+    if (!supabase) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    this.loggedIn = Boolean(sessionData.session);
+    if (this.loggedIn) await this.seedMissingDefaults();
+    await this.loadPublicData();
+    if (this.loggedIn) await this.loadApplications();
+  }
+
+  private async loadPublicData(): Promise<void> {
+    if (!supabase) return;
+    const [loansRes, propsRes, configRes] = await Promise.all([
+      supabase.from('loans').select('data').order('position'),
+      supabase.from('properties').select('data').order('position'),
+      supabase.from('app_config').select('key, value')
+    ]);
+    if (loansRes.error) throw loansRes.error;
+    if (propsRes.error) throw propsRes.error;
+    if (configRes.error) throw configRes.error;
+
+    // An empty table means "never customised yet" — keep the built-in defaults.
+    if (loansRes.data.length > 0) this.loans = loansRes.data.map((r) => r.data as LoanCategoryItem);
+    if (propsRes.data.length > 0) this.properties = propsRes.data.map((r) => r.data as PropertyListingItem);
+    for (const row of configRes.data) {
+      if (row.key === 'library') this.library = row.value as LibraryConfig;
+      if (row.key === 'settings') this.settings = { ...stripLegacySettings(INITIAL_SETTINGS), ...stripLegacySettings(row.value) };
+      if (row.key === 'content') this.content = row.value as WebsiteContent;
     }
   }
 
-  private init() {
-    if (typeof window === 'undefined') return;
-
-    if (!localStorage.getItem(KEYS.APPLICATIONS)) {
-      localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(INITIAL_APPLICATIONS));
-    }
-    if (!localStorage.getItem(KEYS.LOANS)) {
-      localStorage.setItem(KEYS.LOANS, JSON.stringify(INITIAL_LOANS));
-    }
-    if (!localStorage.getItem(KEYS.PROPERTIES)) {
-      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(INITIAL_PROPERTIES));
-    }
-    if (!localStorage.getItem(KEYS.LIBRARY)) {
-      localStorage.setItem(KEYS.LIBRARY, JSON.stringify(INITIAL_LIBRARY_CONFIG));
-    }
-    if (!localStorage.getItem(KEYS.SETTINGS)) {
-      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
-    }
-    if (!localStorage.getItem(KEYS.CONTENT)) {
-      localStorage.setItem(KEYS.CONTENT, JSON.stringify(INITIAL_WEBSITE_CONTENT));
-    }
+  private async loadApplications(): Promise<void> {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('applications').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    this.applications = (data as ApplicationRow[]).map(fromRow);
   }
 
+  // Re-fetch everything (admin "refresh" button).
+  public async refresh(): Promise<void> {
+    if (!supabase) return;
+    await this.loadPublicData();
+    if (this.loggedIn) await this.loadApplications();
+    this.notify();
+  }
+
+  // First admin login on a fresh project: write the defaults so later edits of one item don't hide the rest.
+  private async seedMissingDefaults(): Promise<void> {
+    if (!supabase) return;
+    const [loansRes, propsRes, configRes] = await Promise.all([
+      supabase.from('loans').select('id', { count: 'exact', head: true }),
+      supabase.from('properties').select('id', { count: 'exact', head: true }),
+      supabase.from('app_config').select('key')
+    ]);
+    if (loansRes.error || propsRes.error || configRes.error) return;
+    const haveKeys = new Set(configRes.data.map((r) => r.key));
+
+    const jobs: PromiseLike<unknown>[] = [];
+    if (!loansRes.count) jobs.push(this.persist(supabase.from('loans').upsert(this.toItemRows(INITIAL_LOANS))));
+    if (!propsRes.count) jobs.push(this.persist(supabase.from('properties').upsert(this.toItemRows(INITIAL_PROPERTIES))));
+    if (!haveKeys.has('library')) jobs.push(this.saveConfig('library', INITIAL_LIBRARY_CONFIG));
+    if (!haveKeys.has('settings')) jobs.push(this.saveConfig('settings', stripLegacySettings(INITIAL_SETTINGS)));
+    if (!haveKeys.has('content')) jobs.push(this.saveConfig('content', INITIAL_WEBSITE_CONTENT));
+    await Promise.all(jobs);
+  }
+
+  // --- SUBSCRIPTIONS ---
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -948,14 +966,32 @@ class MahadevDatabaseService {
     }
   }
 
+  // --- PERSISTENCE HELPERS ---
+  // Writes are optimistic (cache is updated first); failures are surfaced to the admin UI via an event.
+  private async persist(request: PromiseLike<{ error: { message: string } | null }>): Promise<void> {
+    try {
+      const { error } = await request;
+      if (error) throw new Error(error.message);
+    } catch (err) {
+      console.error('Supabase write failed:', err);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mahadev_db_error', { detail: (err as Error).message }));
+      }
+    }
+  }
+
+  private toItemRows<T extends { id: string }>(items: T[]) {
+    return items.map((item, position) => ({ id: item.id, position, data: item }));
+  }
+
+  private saveConfig(key: 'library' | 'settings' | 'content', value: unknown): Promise<void> {
+    if (!supabase) return Promise.resolve();
+    return this.persist(supabase.from('app_config').upsert({ key, value, updated_at: new Date().toISOString() }));
+  }
+
   // --- APPLICATIONS ---
   public getApplications(): ApplicationRecord[] {
-    try {
-      const data = localStorage.getItem(KEYS.APPLICATIONS);
-      return data ? JSON.parse(data) : INITIAL_APPLICATIONS;
-    } catch {
-      return INITIAL_APPLICATIONS;
-    }
+    return this.applications;
   }
 
   public addApplication(
@@ -967,9 +1003,9 @@ class MahadevDatabaseService {
     city: string,
     details: Record<string, any>
   ): ApplicationRecord {
-    const apps = this.getApplications();
+    const now = new Date().toISOString();
     const newRecord: ApplicationRecord = {
-      id: `APP-${Math.floor(10000 + Math.random() * 90000)}`,
+      id: `APP-${Math.floor(10000000 + Math.random() * 90000000)}`,
       type,
       category,
       title,
@@ -977,302 +1013,277 @@ class MahadevDatabaseService {
       mobile,
       city: city || 'Local Area',
       status: 'New',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       details,
       notes: [
         {
           id: `n-${Date.now()}`,
           text: `Application received online via ${category} service portal.`,
-          createdAt: new Date().toISOString(),
+          createdAt: now,
           author: 'System Auto-Log'
         }
       ]
     };
 
-    const updated = [newRecord, ...apps];
-    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(updated));
+    // Visitors can submit but not read enquiries, so only an admin session keeps it in the local list.
+    if (this.loggedIn) this.applications = [newRecord, ...this.applications];
+    if (supabase) void this.persist(supabase.from('applications').insert(toRow(newRecord)));
     this.notify();
     return newRecord;
   }
 
-  public updateApplicationStatus(id: string, status: ApplicationStatus): boolean {
-    const apps = this.getApplications();
-    const idx = apps.findIndex((a) => a.id === id);
+  private patchApplication(id: string, change: (app: ApplicationRecord) => void): boolean {
+    const idx = this.applications.findIndex((a) => a.id === id);
     if (idx === -1) return false;
 
-    apps[idx].status = status;
-    apps[idx].updatedAt = new Date().toISOString();
-    apps[idx].notes.push({
-      id: `n-${Date.now()}`,
-      text: `Status updated to "${status}"`,
-      createdAt: new Date().toISOString(),
-      author: 'Admin'
-    });
+    const updated: ApplicationRecord = { ...this.applications[idx], notes: [...this.applications[idx].notes] };
+    change(updated);
+    updated.updatedAt = new Date().toISOString();
+    this.applications = this.applications.map((a, i) => (i === idx ? updated : a));
 
-    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(apps));
+    if (supabase) {
+      void this.persist(
+        supabase
+          .from('applications')
+          .update({ status: updated.status, notes: updated.notes, updated_at: updated.updatedAt })
+          .eq('id', id)
+      );
+    }
     this.notify();
     return true;
+  }
+
+  public updateApplicationStatus(id: string, status: ApplicationStatus): boolean {
+    return this.patchApplication(id, (app) => {
+      app.status = status;
+      app.notes.push({ id: `n-${Date.now()}`, text: `Status updated to "${status}"`, createdAt: new Date().toISOString(), author: 'Admin' });
+    });
   }
 
   public addApplicationNote(id: string, noteText: string, author: string = 'Admin'): boolean {
-    const apps = this.getApplications();
-    const idx = apps.findIndex((a) => a.id === id);
-    if (idx === -1) return false;
-
-    apps[idx].notes.push({
-      id: `n-${Date.now()}`,
-      text: noteText,
-      createdAt: new Date().toISOString(),
-      author
+    return this.patchApplication(id, (app) => {
+      app.notes.push({ id: `n-${Date.now()}`, text: noteText, createdAt: new Date().toISOString(), author });
     });
-    apps[idx].updatedAt = new Date().toISOString();
-
-    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(apps));
-    this.notify();
-    return true;
   }
 
   public deleteApplication(id: string): boolean {
-    const apps = this.getApplications();
-    const filtered = apps.filter((a) => a.id !== id);
-    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(filtered));
+    this.applications = this.applications.filter((a) => a.id !== id);
+    if (supabase) void this.persist(supabase.from('applications').delete().eq('id', id));
     this.notify();
     return true;
   }
 
   // --- LOANS MANAGEMENT ---
   public getLoans(): LoanCategoryItem[] {
-    try {
-      const data = localStorage.getItem(KEYS.LOANS);
-      return data ? JSON.parse(data) : INITIAL_LOANS;
-    } catch {
-      return INITIAL_LOANS;
-    }
+    return this.loans;
   }
 
   public saveLoan(loan: LoanCategoryItem): void {
-    const loans = this.getLoans();
-    const idx = loans.findIndex((l) => l.id === loan.id);
-    if (idx >= 0) {
-      loans[idx] = loan;
-    } else {
-      loans.push(loan);
-    }
-    localStorage.setItem(KEYS.LOANS, JSON.stringify(loans));
+    const idx = this.loans.findIndex((l) => l.id === loan.id);
+    const position = idx >= 0 ? idx : this.loans.length;
+    this.loans = idx >= 0 ? this.loans.map((l, i) => (i === idx ? loan : l)) : [...this.loans, loan];
+    if (supabase) void this.persist(supabase.from('loans').upsert({ id: loan.id, position, data: loan }));
     this.notify();
   }
 
   public deleteLoan(id: string): void {
-    const loans = this.getLoans().filter((l) => l.id !== id);
-    localStorage.setItem(KEYS.LOANS, JSON.stringify(loans));
+    this.loans = this.loans.filter((l) => l.id !== id);
+    if (supabase) void this.persist(supabase.from('loans').delete().eq('id', id));
     this.notify();
   }
 
   // --- PROPERTIES MANAGEMENT ---
   public getProperties(): PropertyListingItem[] {
-    try {
-      const data = localStorage.getItem(KEYS.PROPERTIES);
-      if (!data) return INITIAL_PROPERTIES;
-      const parsed: PropertyListingItem[] = JSON.parse(data);
-      return parsed.map((item) => {
-        const fallback = INITIAL_PROPERTIES.find((p) => p.id === item.id);
-        return {
-          ...item,
-          images: item.images && item.images.length > 0 ? item.images : (fallback?.images || [
-            'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&auto=format&fit=crop&q=80'
-          ]),
-          verified: item.verified !== undefined ? item.verified : true,
-          furnished: item.furnished || fallback?.furnished || 'Semi-Furnished',
-          bedrooms: item.bedrooms || fallback?.bedrooms,
-          contactPerson: !item.contactPerson || item.contactPerson.includes('Sharma')
-            ? 'Dharmendra Choudhary Danga (DC Property Vala)'
-            : item.contactPerson
-        };
-      });
-    } catch {
-      return INITIAL_PROPERTIES;
-    }
+    return this.properties.map((item) => {
+      const fallback = INITIAL_PROPERTIES.find((p) => p.id === item.id);
+      return {
+        ...item,
+        images: item.images && item.images.length > 0 ? item.images : (fallback?.images || [
+          'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&auto=format&fit=crop&q=80'
+        ]),
+        verified: item.verified !== undefined ? item.verified : true,
+        furnished: item.furnished || fallback?.furnished || 'Semi-Furnished',
+        bedrooms: item.bedrooms || fallback?.bedrooms,
+        contactPerson: item.contactPerson || 'Dharmendra Choudhary Danga (DC Property Vala)'
+      };
+    });
   }
 
   public saveProperty(property: PropertyListingItem): void {
-    const props = this.getProperties();
-    const idx = props.findIndex((p) => p.id === property.id);
-    if (idx >= 0) {
-      props[idx] = property;
-    } else {
-      props.push(property);
-    }
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
+    const idx = this.properties.findIndex((p) => p.id === property.id);
+    const position = idx >= 0 ? idx : this.properties.length;
+    this.properties = idx >= 0 ? this.properties.map((p, i) => (i === idx ? property : p)) : [...this.properties, property];
+    if (supabase) void this.persist(supabase.from('properties').upsert({ id: property.id, position, data: property }));
     this.notify();
   }
 
   public deleteProperty(id: string): void {
-    const props = this.getProperties().filter((p) => p.id !== id);
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
+    this.properties = this.properties.filter((p) => p.id !== id);
+    if (supabase) void this.persist(supabase.from('properties').delete().eq('id', id));
     this.notify();
   }
 
   // --- LIBRARY CONFIG MANAGEMENT ---
   public getLibraryConfig(): LibraryConfig {
-    try {
-      const data = localStorage.getItem(KEYS.LIBRARY);
-      return data ? JSON.parse(data) : INITIAL_LIBRARY_CONFIG;
-    } catch {
-      return INITIAL_LIBRARY_CONFIG;
-    }
+    return this.library;
   }
 
   public saveLibraryConfig(config: LibraryConfig): void {
-    localStorage.setItem(KEYS.LIBRARY, JSON.stringify(config));
+    this.library = config;
+    void this.saveConfig('library', config);
     this.notify();
   }
 
   // --- SITE SETTINGS ---
   public getSettings(): SiteSettings {
-    try {
-      const data = localStorage.getItem(KEYS.SETTINGS);
-      if (!data) return INITIAL_SETTINGS;
-      const parsed = JSON.parse(data);
-      // Auto-migrate if address is old or phone is old or branches missing/without numbers
-      if (
-        !parsed.branches ||
-        parsed.branches.length < 3 ||
-        !parsed.address ||
-        !parsed.address.includes('Jodhpur') ||
-        !parsed.phone ||
-        parsed.phone.includes('98290 12345') ||
-        !parsed.phoneExecutive ||
-        !parsed.branches[0]?.phone ||
-        !parsed.founderImageUrl ||
-        parsed.founderImageUrl.includes('Founder.jpeg') ||
-        parsed.founderImageUrl.includes('10.50.51') ||
-        !parsed.founderImageUrl.includes('nKmI33Jdg') ||
-        !parsed.instagramUrl ||
-        !parsed.instagramUrl.includes('dcpropertyvala_jodhpur') ||
-        !parsed.instagramPersonalUrl ||
-        !parsed.instagramFinanceUrl ||
-        !parsed.officeBannerUrl ||
-        parsed.officeBannerUrl.includes('office.jpeg')
-      ) {
-        const merged: SiteSettings = {
-          ...INITIAL_SETTINGS,
-          ...parsed,
-          phone: INITIAL_SETTINGS.phone,
-          phoneSecondary: INITIAL_SETTINGS.phoneSecondary,
-          phoneTertiary: INITIAL_SETTINGS.phoneTertiary,
-          phoneExecutive: INITIAL_SETTINGS.phoneExecutive,
-          whatsapp: INITIAL_SETTINGS.whatsapp,
-          address: INITIAL_SETTINGS.address,
-          branches: INITIAL_SETTINGS.branches,
-          founderImageUrl: INITIAL_SETTINGS.founderImageUrl,
-          instagramUrl: INITIAL_SETTINGS.instagramUrl,
-          instagramPersonalUrl: INITIAL_SETTINGS.instagramPersonalUrl,
-          instagramFinanceUrl: INITIAL_SETTINGS.instagramFinanceUrl,
-          officeBannerUrl: INITIAL_SETTINGS.officeBannerUrl
-        };
-        localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
-        return merged;
-      }
-      return parsed;
-    } catch {
-      return INITIAL_SETTINGS;
-    }
+    return this.settings;
   }
 
   public saveSettings(settings: SiteSettings): void {
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    this.settings = stripLegacySettings(settings);
+    void this.saveConfig('settings', this.settings);
     this.notify();
-  }
-
-  // Migrate plain-text PIN to secure hash on app init
-  public async migrateAdminPin(): Promise<void> {
-    try {
-      const data = localStorage.getItem(KEYS.SETTINGS);
-      if (!data) return;
-      const parsed = JSON.parse(data);
-      // If pin is not a 64-char hex SHA-256 hash, it's plain text — upgrade silently
-      if (parsed.adminPin && parsed.adminPin.length < 64) {
-        parsed.adminPin = INITIAL_SETTINGS.adminPin;
-        localStorage.setItem(KEYS.SETTINGS, JSON.stringify(parsed));
-      }
-    } catch {
-      // ignore
-    }
   }
 
   // --- CONTENT ---
   public getContent(): WebsiteContent {
-    try {
-      const data = localStorage.getItem(KEYS.CONTENT);
-      if (!data) return INITIAL_WEBSITE_CONTENT;
-      const saved = JSON.parse(data) as WebsiteContent;
-      // Deep-merge: add any new pages/sections/fields from the seed that aren't in saved
-      const merged: WebsiteContent = { ...INITIAL_WEBSITE_CONTENT };
-      for (const page of Object.keys(saved)) {
-        if (!merged[page]) merged[page] = {};
-        for (const section of Object.keys(saved[page])) {
-          if (!merged[page][section]) merged[page][section] = {};
-          for (const field of Object.keys(saved[page][section])) {
-            merged[page][section][field] = saved[page][section][field];
-          }
+    // Deep-merge: add any new pages/sections/fields from the seed that aren't in saved
+    const merged: WebsiteContent = { ...INITIAL_WEBSITE_CONTENT };
+    for (const page of Object.keys(this.content)) {
+      if (!merged[page]) merged[page] = {};
+      for (const section of Object.keys(this.content[page])) {
+        if (!merged[page][section]) merged[page][section] = {};
+        for (const field of Object.keys(this.content[page][section])) {
+          merged[page][section][field] = this.content[page][section][field];
         }
       }
-      return merged;
-    } catch {
-      return INITIAL_WEBSITE_CONTENT;
     }
+    return merged;
   }
 
   public saveContent(content: WebsiteContent) {
-    localStorage.setItem(KEYS.CONTENT, JSON.stringify(content));
+    this.content = content;
+    void this.saveConfig('content', content);
     this.notify();
   }
 
-  // --- AUTH / ADMIN PIN ---
-  private async hashPin(pin: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin.trim());
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-
+  // --- AUTH (Supabase Auth, admin-only) ---
   public isAdminLoggedIn(): boolean {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem(KEYS.ADMIN_SESSION) === 'true';
+    return this.loggedIn;
   }
 
-  public async adminLogin(pin: string): Promise<boolean> {
-    const settings = this.getSettings();
-    const hashed = await this.hashPin(pin);
-    if (hashed === settings.adminPin) {
-      sessionStorage.setItem(KEYS.ADMIN_SESSION, 'true');
-      return true;
+  public async adminLogin(email: string, password: string): Promise<boolean> {
+    if (!supabase) return false;
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) return false;
+    this.loggedIn = true;
+    try {
+      await this.seedMissingDefaults();
+      await this.loadPublicData();
+      await this.loadApplications();
+    } catch (err) {
+      console.error('Could not load admin data:', err);
     }
-    return false;
+    this.notify();
+    return true;
   }
 
-  public adminLogout(): void {
-    if (typeof window === 'undefined') return;
-    sessionStorage.removeItem(KEYS.ADMIN_SESSION);
+  public async adminLogout(): Promise<void> {
+    this.loggedIn = false;
+    this.applications = [];
+    if (supabase) await supabase.auth.signOut();
+    this.notify();
   }
 
-  // Reset to default seed
+  // --- RESET / IMPORT ---
+  // Customer enquiries are never touched here.
   public resetToDefaults(): void {
-    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(INITIAL_APPLICATIONS));
-    localStorage.setItem(KEYS.LOANS, JSON.stringify(INITIAL_LOANS));
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(INITIAL_PROPERTIES));
-    localStorage.setItem(KEYS.LIBRARY, JSON.stringify(INITIAL_LIBRARY_CONFIG));
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
+    this.loans = INITIAL_LOANS;
+    this.properties = INITIAL_PROPERTIES;
+    this.library = INITIAL_LIBRARY_CONFIG;
+    this.settings = stripLegacySettings(INITIAL_SETTINGS);
+    if (supabase) {
+      void (async () => {
+        await this.persist(supabase.from('loans').delete().neq('id', ''));
+        await this.persist(supabase.from('properties').delete().neq('id', ''));
+        await this.persist(supabase.from('loans').upsert(this.toItemRows(INITIAL_LOANS)));
+        await this.persist(supabase.from('properties').upsert(this.toItemRows(INITIAL_PROPERTIES)));
+      })();
+    }
+    void this.saveConfig('library', INITIAL_LIBRARY_CONFIG);
+    void this.saveConfig('settings', this.settings);
     this.notify();
   }
 
   public resetContent(): void {
-    localStorage.setItem(KEYS.CONTENT, JSON.stringify(INITIAL_WEBSITE_CONTENT));
+    this.content = INITIAL_WEBSITE_CONTENT;
+    void this.saveConfig('content', INITIAL_WEBSITE_CONTENT);
     this.notify();
+  }
+
+  private readLegacy<T>(key: string): T | null {
+    try {
+      const raw = typeof window === 'undefined' ? null : localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // True when this browser still holds data saved by the old localStorage version.
+  public hasLegacyLocalData(): boolean {
+    return Object.values(LEGACY_KEYS).some((key) => this.readLegacy(key) !== null);
+  }
+
+  // One-time upload of everything this browser had in localStorage into Supabase (admin only).
+  public async importLegacyLocalData(): Promise<number> {
+    if (!supabase || !this.loggedIn) throw new Error('Login as admin first');
+    let imported = 0;
+
+    const apps = this.readLegacy<ApplicationRecord[]>(LEGACY_KEYS.APPLICATIONS);
+    if (apps?.length) {
+      const known = new Set(this.applications.map((a) => a.id));
+      const fresh = apps.filter((a) => !known.has(a.id));
+      if (fresh.length) {
+        const { error } = await supabase.from('applications').insert(fresh.map(toRow));
+        if (error) throw new Error(error.message);
+        imported += fresh.length;
+      }
+    }
+
+    const loans = this.readLegacy<LoanCategoryItem[]>(LEGACY_KEYS.LOANS);
+    if (loans?.length) {
+      this.loans = loans;
+      await this.persist(supabase.from('loans').delete().neq('id', ''));
+      await this.persist(supabase.from('loans').upsert(this.toItemRows(loans)));
+    }
+    const properties = this.readLegacy<PropertyListingItem[]>(LEGACY_KEYS.PROPERTIES);
+    if (properties?.length) {
+      this.properties = properties;
+      await this.persist(supabase.from('properties').delete().neq('id', ''));
+      await this.persist(supabase.from('properties').upsert(this.toItemRows(properties)));
+    }
+    const library = this.readLegacy<LibraryConfig>(LEGACY_KEYS.LIBRARY);
+    if (library) {
+      this.library = library;
+      await this.saveConfig('library', library);
+    }
+    const settings = this.readLegacy<SiteSettings>(LEGACY_KEYS.SETTINGS);
+    if (settings) {
+      this.settings = { ...stripLegacySettings(INITIAL_SETTINGS), ...stripLegacySettings(settings) };
+      await this.saveConfig('settings', this.settings);
+    }
+    const content = this.readLegacy<WebsiteContent>(LEGACY_KEYS.CONTENT);
+    if (content) {
+      this.content = content;
+      await this.saveConfig('content', content);
+    }
+
+    await this.loadApplications();
+    this.notify();
+    return imported;
   }
 }
 
 export const dbService = new MahadevDatabaseService();
-

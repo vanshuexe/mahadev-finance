@@ -272,6 +272,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {' · '}
           <a href="https://mahadevinvestorjodhpur.com/robots.txt" className="hover:text-slate-400 transition-colors" target="_blank" rel="noopener">Robots</a>
         </span>
+        <div className="max-w-4xl mx-auto mt-4 pt-4 border-t border-slate-800/80 text-left">
+          <h4 className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-1.5">
+            Project Completion and Handover
+          </h4>
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            Development is scheduled to conclude on 24 October 2026. After development is complete, the developer will hand over all project files and the project database to Mahadev finance account. From the date the handover is completed, the client is responsible for operating, maintaining, securing, and managing the website and its content, accounts, and transactions. To the extent permitted by applicable law and subject to any written agreement, the developer is not responsible for fraud, unlawful activity, or other actions arising from the client's or other users' use of the website after handover. This statement does not exclude liability that cannot legally be excluded.
+          </p>
+        </div>
       </div>
     </footer>
   );
